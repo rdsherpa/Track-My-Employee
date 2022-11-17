@@ -48,34 +48,34 @@ function init() {
     ])
     .then((answer) => {
       switch (answer.action) {
-        case "View all departments":
+        case "View_all_departments":
           // console.log("You want to View all departments");
           viewAllDepts(); // invoking viewAllDepts function
-          init(); //I wanted user to prompt again, until user hits 'Quit'
+          // init(); //I wanted user to prompt again, until user hits 'Quit'
           break;
-        case "View all roles":
+        case "View_all_roles":
           console.log("You want to View all roles");
-          init();
+          viewAllRoles();
           break;
-        case "View all employees":
+        case "View_all_employees":
           console.log("You want to View all employees ");
-          init();
+          viewAllEmps();
           break;
-        case "Add a department":
+        case "Add_a_department":
           console.log("You want to Add a department");
-          init();
+          addDept();
           break;
-        case "Add a role":
+        case "Add_a_role":
           console.log("You want to Add a role");
-          init();
+          addRole();
           break;
-        case "Add an employee":
+        case "Add_an_employee":
           console.log("You want to Add an employee");
-          init();
+          addEmployee();
           break;
-        case "Update an employee role":
+        case "Update_an_employee_role":
           console.log("You want to View all departments");
-          init();
+          addUpdateRole();
           break;
         default:
           process.exit();
@@ -103,13 +103,11 @@ function viewAllDepts() {
   const sql = "SELECT * FROM  department";
   db.promise()
     .query(sql)
-    .then((result) => {
+    .then(([result], err) => {
       // creating a callback funtion
-      // if (err) return console.log(err);
+
+      if (err) return console.log(err);
       console.table(result);
-      init();
-    })
-    .then(() => {
       init();
     })
     .catch((err) => console.log(err));
@@ -121,9 +119,9 @@ function viewAllRoles() {
     "SELECT *, department.name FROM role join department ON  department.id = role.department_id";
   db.promise()
     .query(sql)
-    .then((result) => {
+    .then(([result], err) => {
       // creating a callback funtion
-      // if (err) return console.log(err);
+      if (err) return console.log(err);
       console.table(result); // this results contains rows returned by the server
       init();
     })
@@ -134,18 +132,18 @@ function viewAllRoles() {
 // THEN I am presented with a formatted table showing employee data, including employee ids, first names, last names, job titles, departments, salaries, and managers that the employees report to
 
 function viewAllEmps() {
+  console.log("In VIEW EMPLOYEES function");
   //function that is invoked when choses ViewAllEmps
-  const sql = `SELECT emp.id, emp.first_name, emp.last_name, title, salary, CONCAT (mgr.first_name, '', mgr.last_name) AS manager
-                FROM employee emp
-                LEFT JOIN employee mgr ON mgr.id = emp.manager_id
-                LEFT JOIN role ON emp.role_id = role.id;
-                LEFT JOIN department ON role.department_id = department.id;`;
+  //const sql_simple = "SELECT * FROM employee;";
+  const sql = `SELECT emp.id, emp.first_name, emp.last_name, title, salary, CONCAT (mgr.first_name, '', mgr.last_name) AS manager FROM employee as emp LEFT JOIN employee mgr ON mgr.id = emp.manager_id LEFT JOIN role ON emp.role_id = role.id LEFT JOIN department ON role.department_id = department.id;`;
+
   db.promise()
+    //.query(sql_simple)
     .query(sql)
-    .then(([rows, _]) => {
+    .then(([result], err) => {
       // creating a callback funtion
-      // if (err) return console.log(err);
-      console.table(rows);
+      if (err) return console.log(err);
+      console.table(result);
       init();
     })
     .catch((err) => console.log(err));
@@ -153,154 +151,285 @@ function viewAllEmps() {
 
 //Adding department
 function addDept() {
-  inquirer.prompt([
-    {
-      type: "list",
-      name: "action",
-      message: "What department would you like to add?",
-      choices: [],
-    },
-  ]);
-  const sql = "SELECT name FROM department";
-  db.promise()
-    .query(sql)
-    .then(([rows, _]) => {
-      console.table(rows);
-      init();
-    })
-    .catch((err) => console.log(err));
+  inquirer
+    .prompt([
+      {
+        type: "input",
+        name: "name",
+        message: "What department would you like to add?",
+        validate: (departmentName) => {
+          if (departmentName) {
+            return true;
+          } else {
+            console.log("Please enter the name of your department!");
+          }
+        },
+      },
+    ])
+    .then((name) => {
+      connection.promise().query("INSERT INTO department SET?", name);
+      selectDepartments();
+    });
 }
 
 function addRole() {
-  inquirer.prompt([
-    {
-      type: "input",
-      name: "title",
-      message: "Please enter your title?",
-      choices: [],
-    },
-    {
-      type: "list",
-      name: "department",
-      message: "Which department are you from?",
-      choices: [],
-    },
-    {
-      type: "input",
-      name: "salary",
-      message: "Enter your salary",
-    },
-  ]);
-  const sql = "SELECT name FROM department";
+  /*  db.query("SELECT departmet.id, department.name FROM department;", function(err, data) {
+    if(err) {
+      console.log(err);
+    }
+    console.log(data)
+  });
+  */
+
   db.promise()
-    .query(sql)
-    .then(([rows, _]) => {
-      console.table(rows);
-      init();
+    .query("SELECT id, name FROM department;")
+    .then(([departments]) => {
+      console.log(departments);
+      let departmentChoices = departments.map(({ id, name }) => ({
+        name: name,
+        value: id,
+      }));
+
+      // this is our SECOND ASYNC request (dependant on data from the FIRST ASYNC request --> to our database)
+      inquirer
+        .prompt([
+          {
+            type: "input",
+            name: "title",
+            message: "Please enter your title?",
+            validate: (titleName) => {
+              if (titleName) {
+                return true;
+              } else {
+                console.log("Please enter your title name!");
+                return false;
+              }
+            },
+          },
+          {
+            type: "list",
+            name: "department",
+            message: "Which department are you from?",
+            choices: departmentChoices,
+          },
+          {
+            type: "input",
+            name: "salary",
+            message: "Enter your salary",
+            validate: (salary) => {
+              if (salary) {
+                return true;
+              } else {
+                console.log("Please enter your salary");
+                return false;
+              }
+            },
+          },
+        ])
+
+        // .then((name) => {
+        //   connection.promise().query("INSERT INTO department SET?", name);
+        //   selectDepartments();
+        // });
+
+        .then(({ title, department, salary }) => {
+          connection.promise().query(
+            "INSERT INTO role SET?",
+            {
+              title: title,
+              department_id: department,
+              salary: salary,
+            },
+            function (err, res) {
+              if (err) return console.log(err);
+            }
+          );
+        })
+        .then(() => selectRoles());
     })
-    .catch((err) => console.log(err));
+    .catch((err) => {
+      console.log(err);
+    });
 }
 
 function addEmployee() {
-  inquirer.prompt([
-    {
-      type: "list",
-      name: "action",
-      message: "What department would you like to add?",
-      choices: [],
-    },
-  ]);
-  const sql = `SELECT Rol.id, Rol.title FROM role Rol; SELECT Emp.id, CONCAT(
-    Emp.first_name, '', Emp.last_name) AS manager FROM employee E;
-  )`;
+  // return connection.promise().query(
+  //   "SELECT Rol.id, Rol.title FROM role R;"
+  // )
+  //   .then(([employees]) => {
+  //     let titleChoices = employees.map(({
+  //       id,title
+  //     }) => ({
+  //       value: id,
+  //       name: title
+  //     }))
+  //   })
+
   db.promise()
-    .query(sql)
-    .then(([rows, _]) => {
-      console.table(rows);
-      init();
+    .query(
+      "SELECT Emp.id, CONCAT(Emp.First_name, ' ', Emp.last_name) AS manager FROM employee Emp;"
+    )
+    .then(([managers]) => {
+      let managerChoices = managers.map(({ id, manager }) => ({
+        value: id,
+        name: manager,
+      }));
+    });
+
+  inquirer
+    .prompt([
+      {
+        type: "list",
+        name: "firstName",
+        message: "What is the employees first name?",
+        validate: (firstName) => {
+          if (firstName) {
+            return true;
+          } else {
+            console.log("Please enter the employees first name!");
+            return false;
+          }
+        },
+      },
+      {
+        type: "list",
+        name: "role",
+        message: "What is the employees role?",
+        choices: titleChoices,
+      },
+      {
+        type: "list",
+        name: "manager",
+        message: "Who is the employees manager?",
+        choices: managerChoices,
+      },
+    ])
+    .then(({ firstName, lastName, role, manager }) => {
+      const query = connection.query(
+        "INSERT INTO employee SET ?",
+        {
+          first_name: firstName,
+          last_name: lastName,
+          role_id: role,
+          manager_id: manager,
+        },
+        function (err, res) {
+          if (err) return console.log(err);
+        }
+      );
     })
-    .catch((err) => console.log(err));
+    .then(() => selectEmployees());
 }
 
-function init() {
-  inquirer.prompt([
-    {
-      type: "list",
-      name: "firstName",
-      message: "What is the employees first name",
-      validate: (firstName) => {
-        if (firstName) {
-          return true;
-        } else {
-          console.log("Please enter the employees first name!");
-          return false;
-        }
-      },
-    },
-    {
-      type: "list",
-      name: "lastName",
-      message: "What is the employees last name",
-      validate: (firstName) => {
-        if (firstName) {
-          return true;
-        } else {
-          console.log("Please enter the employees last name!");
-          return false;
-        }
-      },
-    },
-    {
-      type: "list",
-      name: "role",
-      message: "What is the employees role?",
-      choices: titleChoices,
-    },
-    {
-      type: "list",
-      name: "manager",
-      message: "Who is the employees manager?",
-      choices: managerChoices,
-    },
-  ]);
-}
+// function questionEmp() {
+//   inquirer.prompt([
+//     {
+//       type: "list",
+//       name: "firstName",
+//       message: "What is the employees first name",
+//       validate: (firstName) => {
+//         if (firstName) {
+//           return true;
+//         } else {
+//           console.log("Please enter the employees first name!");
+//           return false;
+//         }
+//       },
+//     },
+//     {
+//       type: "list",
+//       name: "lastName",
+//       message: "What is the employees last name",
+//       validate: (firstName) => {
+//         if (firstName) {
+//           return true;
+//         } else {
+//           console.log("Please enter the employees last name!");
+//           return false;
+//         }
+//       },
+//     },
+//     {
+//       type: "list",
+//       name: "role",
+//       message: "What is the employees role?",
+//       choices: titleChoices,
+//     },
+//     {
+//       type: "list",
+//       name: "manager",
+//       message: "Who is the employees manager?",
+//       choices: managerChoices,
+//     },
+//   ]);
+// }
 
 function addUpdateRole() {
-  inquirer.prompt([
-    {
+  // return connecton.promise().query(
+  //   "SELECT Rol.id, Rol.title, Rol.Salary, Rol.department_id FROM role Rol;"
+  // )
+  //  .then(([roles])) => {
+  //   let roleChoices = roles.map(({
+  //     id, title
+  //   }) => ({
+  //     value: id,
+  //     name: title
+  //   }));
+  //  }
+
+  inquirer
+    .prompt({
       type: "list",
       name: "role",
       message: "Which role do you want to update?",
       choices: roleChoices,
-    },
-    {
-      type: "input",
-      name: "title",
-      message: "Enter the name of your title",
-      validate: titleName => {
-        if(titleName) {
-          return true;
-        } else {
-          console.log('Please enter your title name');
-        }
-        }
-      }
-    },
-    {
-      type: "input",
-      name: "salary",
-      message: "Enter your salary",
-    },
-  ]);
-  const sql = `SELECT roleUp.id, roleUp.title, roleUp.salary, roleUp.department_id FROM role R;`;
-  db.promise()
-    .query(sql)
-    .then(([rows, _]) => {
-      console.table(rows);
-      init();
     })
-    .catch((err) => console.log(err));
-}
-.then(() => promptMenu())
+    .then((role) => {
+      console.log(role);
 
-promptMenu();
+      inquirer
+        .prompt([
+          {
+            type: "input",
+            name: "title",
+            message: "Enter the name of your title",
+            validate: (titleName) => {
+              if (titleName) {
+                return true;
+              } else {
+                console.log("Please enter your title name");
+                return false;
+              }
+            },
+          },
+          {
+            type: "input",
+            name: "salary",
+            message: "Enter your salary",
+            validate: (salary) => {
+              if (salary) {
+                return true;
+              } else {
+                console.log("Please enter your salary!");
+                return false;
+              }
+            },
+          },
+        ])
+        .then(({ title, salary }) => {
+          const query = connection.query(
+            "UPDATE role SET title = ?, salary = ? WHERE id = ?",
+            [title, salary, role.role],
+            function (err, res) {
+              if (err) console.log(err);
+            }
+          );
+        })
+        .then(() => {
+          //promptMenu();
+          init();
+        });
+    });
+}
+
+// promptMenu();
